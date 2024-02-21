@@ -22,6 +22,8 @@ import favicon from '../public/favicon.svg';
 import resetStyles from './styles/reset.css';
 import appStyles from './styles/app.css';
 import {Layout} from '~/components/Layout';
+import {useEffect} from 'react';
+import {Theme, ThemeProvider} from './providers/ThemeProvider';
 
 /**
  * This is important to avoid re-fetching root queries on sub-navigations
@@ -68,9 +70,19 @@ export const useRootLoaderData = () => {
   return root?.data as SerializeFrom<typeof loader>;
 };
 
-export async function loader({context}: LoaderFunctionArgs) {
+export async function loader({request, context}: LoaderFunctionArgs) {
   const {storefront, customerAccount, cart} = context;
   const publicStoreDomain = context.env.PUBLIC_STORE_DOMAIN;
+
+  const cookieString = request.headers.get('Cookie');
+  const cookieMap = new Map<string, string>();
+  if (cookieString) {
+    cookieString.split(';').forEach((cookie) => {
+      const [key, value] = cookie.split('=');
+      cookieMap.set(key.trim(), value.trim());
+    });
+  }
+  const themeCookie = cookieMap.get('hydro-theme');
 
   const isLoggedInPromise = customerAccount.isLoggedIn();
 
@@ -97,7 +109,10 @@ export async function loader({context}: LoaderFunctionArgs) {
     {
       cart: cartPromise,
       footer: footerPromise,
-      header: await headerPromise,
+      header: {
+        ...(await headerPromise),
+        theme: themeCookie as Theme | undefined,
+      },
       isLoggedIn: isLoggedInPromise,
       publicStoreDomain,
     },
@@ -113,8 +128,19 @@ export default function App() {
   const nonce = useNonce();
   const data = useLoaderData<typeof loader>();
 
+  const {theme} = data.header;
+
+  useEffect(() => {
+    if (!theme) {
+      const defaultTheme = 'light';
+      const cookie = `hydro-theme=${defaultTheme}; path=/; max-age=31536000; samesite=strict`;
+      document.cookie = cookie;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <html lang="en">
+    <html lang="en" className={theme ? theme : 'light'}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -122,9 +148,11 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <Layout {...data}>
-          <Outlet />
-        </Layout>
+        <ThemeProvider initialTheme={theme}>
+          <Layout {...data}>
+            <Outlet />
+          </Layout>
+        </ThemeProvider>
         <ScrollRestoration nonce={nonce} />
         <Scripts nonce={nonce} />
         <LiveReload nonce={nonce} />
