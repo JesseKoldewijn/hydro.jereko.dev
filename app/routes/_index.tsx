@@ -11,7 +11,11 @@ export const meta: MetaFunction = () => {
   return [
     {
       title: 'Hydrogen | Home',
-      description: 'Welcome to the Hydrogen demo store.',
+    },
+    {
+      name: 'description',
+      content:
+        'Hydrogen is a demo ecommerce storefront built with Remix and Hydrogen.',
     },
   ];
 };
